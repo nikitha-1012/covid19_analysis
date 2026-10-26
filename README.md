@@ -1,331 +1,382 @@
-# COVID-19 Pandemic Analysis
+# COVID-19 Big Data Analytics (BDA) Dashboard & MongoDB Atlas Platform
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Matplotlib-Visualization-blue?logo=plotly&logoColor=white" alt="Matplotlib">
-  <img src="https://img.shields.io/badge/Scipy-Statistics-blue" alt="Scipy">
-  <img src="https://img.shields.io/badge/Status-Completed-green" alt="Status">
+  <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Database-MongoDB%20Atlas-green?logo=mongodb&logoColor=white" alt="MongoDB Atlas">
+  <img src="https://img.shields.io/badge/Backend-FastAPI-teal?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Frontend-Tailwind%20%2B%20Chart.js-purple" alt="Frontend">
+  <img src="https://img.shields.io/badge/Status-Production%20Ready-brightgreen" alt="Status">
 </p>
 
 <p align="center">
-  <strong>An end-to-end exploratory data analysis and visualization of the COVID-19 pandemic</strong><br>
-  Combining JHU CSSE case data with World Bank socioeconomic indicators to uncover trends across time, geography, and population health metrics.
+  <strong>An end-to-end Big Data Analytics (BDA) web application powered by MongoDB Atlas</strong><br>
+  Transforms raw and processed COVID-19 epidemiological data (JHU CSSE) and World Bank socioeconomic indicators into an interactive, high-performance analytical dashboard using distributed database aggregation pipelines.
 </p>
 
 ---
 
 ## 📑 Table of Contents
 
-- [About This Project](#about-this-project)
-- [Problem Statement](#problem-statement)
-- [Data Sources](#data-sources)
-- [Project Structure](#project-structure)
-- [Methodology](#methodology)
-  - [1. Data Acquisition](#1-data-acquisition)
-  - [2. Data Wrangling](#2-data-wrangling)
-  - [3. Feature Engineering](#3-feature-engineering)
-  - [4. Visualization](#4-visualization)
-- [Key Findings](#key-findings)
-- [Technical Specifications](#technical-specifications)
-- [How to Reproduce](#how-to-reproduce)
-- [Notebook Guide](#notebook-guide)
-- [Author](#author)
+1. [Project Overview & Objective](#project-overview--objective)
+2. [Why MongoDB Atlas for Big Data Analytics?](#why-mongodb-atlas-for-big-data-analytics)
+3. [System Architecture & Data Flow](#system-architecture--data-flow)
+4. [Database Collections & Document Schema](#database-collections--document-schema)
+5. [Data Ingestion & Duplicate Prevention](#data-ingestion--duplicate-prevention)
+6. [MongoDB Aggregation Pipelines](#mongodb-aggregation-pipelines)
+7. [Web Dashboard Features](#web-dashboard-features)
+8. [Technology Stack](#technology-stack)
+9. [Quick Start & Run Instructions (VS Code & PowerShell)](#quick-start--run-instructions-vs-code--powershell)
+10. [REST API Documentation](#rest-api-documentation)
+11. [Testing & Verification](#testing--verification)
+12. [Troubleshooting Guide](#troubleshooting-guide)
+13. [Original Exploratory Notebooks & Data Sources](#original-exploratory-notebooks--data-sources)
 
 ---
 
-## About This Project
+## Project Overview & Objective
 
-This project provides a comprehensive analysis of the SARS-CoV-2 pandemic using open-source data. The analysis is organized into five Jupyter notebooks covering the full data pipeline — from raw data ingestion to publication-ready visualizations.
+This project fulfills the requirements of a **Final-Year Engineering Big Data Analytics (BDA)** course. It upgrades a traditional offline Python data analysis project into a cloud-native, database-backed analytical web platform.
 
-The project demonstrates:
-- **Automated data pipelines** for daily epidemic surveillance
-- **Multi-granularity analysis** (global, continental, national)
-- **Socioeconomic correlation studies** linking pandemic metrics to World Bank indicators
-- **Reproducible visualization architecture** via a custom `CovidDataViz` class
+The system ingests over 34,000 historical epidemiological records spanning January 2020 through March 2023 across 198 countries, stores them in MongoDB Atlas, and exposes them through real-time aggregation queries and a responsive web dashboard.
 
 ---
 
-## Problem Statement
+## Why MongoDB Atlas for Big Data Analytics?
 
-The COVID-19 pandemic spread rapidly across the world, but the pace and severity varied significantly across countries and continents. Key questions this project addresses:
+Traditional relational databases (RDBMS) struggle with evolving time-series records, semi-structured socioeconomic indicators, and multi-granularity aggregations. MongoDB Atlas was selected for the following BDA advantages:
 
-1. How did the pandemic evolve globally and regionally from December 2019 to October 2020?
-2. Which countries and continents were most severely impacted?
-3. How do socioeconomic factors (GDP, healthcare expenditure, rural population, life expectancy) correlate with case rates and mortality?
-4. What patterns emerge when examining mortality rates across different country profiles?
-
----
-
-## Data Sources
-
-| Source | Description | URL |
-|--------|-------------|-----|
-| JHU CSSE COVID-19 Data | Daily time series of confirmed, recovered, dead, and active cases by country | [GitHub](https://github.com/CSSEGISandData/COVID-19) |
-| World Bank — GDP per capita PPP | Economic indicator by country | [data.worldbank.org](https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD) |
-| World Bank — Population | Total population | [data.worldbank.org](https://data.worldbank.org/indicator/SP.POP.TOTL) |
-| World Bank — Urban Population | Urban population percentage | [data.worldbank.org](https://data.worldbank.org/indicator/SP.URB.TOTL.IN.ZS) |
-| World Bank — Slum Population | Population living in slums | [data.worldbank.org](https://data.worldbank.org/indicator/EN.POP.SLUM.UR.ZS) |
-| World Bank — Rural Population | Rural population percentage | [data.worldbank.org](https://data.worldbank.org/indicator/SP.RUR.TOTL.ZS) |
-| World Bank — Life Expectancy | Life expectancy at birth | [data.worldbank.org](https://data.worldbank.org/indicator/SP.DYN.LE00.IN) |
-| World Bank — Healthcare Expenditure | Current healthcare expenditure (% of GDP) | [data.worldbank.org](https://data.worldbank.org/indicator/SH.XPD.CHEX.GD.ZS) |
-| Country & Continent Codes | Country-to-continent mapping | [Datahub](https://datahub.io/JohnSnowLabs/country-and-continent-codes-list) |
+1. **Document-Oriented Flexibility**: Stores diverse data types (daily case time series, spatial coordinates, World Bank indicators) in clean JSON-like BSON documents without rigid schema migrations.
+2. **Powerful Distributed Aggregation Framework**: Computes worldwide totals, weighted mortality rates, and continental rollups natively in the database engine using `$group`, `$project`, `$round`, and `$cond`, offloading CPU-intensive processing from the web application server.
+3. **Compound Indexing & Fast Retrieval**: Employs unique compound indexes (`{country: 1, date: 1}`) for sub-millisecond chronological queries and guaranteed idempotency.
+4. **Cloud Scalability**: Hosted on MongoDB Atlas M0 free tier with zero local server maintenance.
 
 ---
 
-## Project Structure
+## System Architecture & Data Flow
 
 ```
-covid19-pandemic-analysis/
-├── data/
-│   └── download_data.py              # Automated data download script
-├── features/                         # Data processing pipeline
-│   ├── make_all.py                   # Master pipeline runner
-│   ├── make_cases.py                 # JHU CSSE case ingestion
-│   ├── make_cases_daily_change.py    # Daily differencing
-│   ├── make_cases_since_t0.py        # Reindexed time series
-│   ├── make_continents.py            # Continent aggregation
-│   ├── make_coordinates.py           # Geo coordinate mapping
-│   ├── make_country_stats.py         # Country-level summaries
-│   ├── make_country_to_continent.py  # Country-to-continent mapping
-│   ├── make_mortality.py             # Mortality rate calculation
-│   ├── make_world_bank.py            # World Bank indicator ingestion
-│   └── utils.py                      # Shared utilities
-├── visualizations/
-│   └── covid_data_viz.py             # Reusable CovidDataViz plotting class
-├── notebooks/                        # Analysis notebooks
-│   ├── Data-wrangling.ipynb          # Data pipeline documentation
-│   ├── Exploratory-analysis-globally.ipynb   # World & continent trends
-│   ├── Exploratory_analysis_fancy_plot.ipynb  # Publication-ready visual
-│   ├── Exploratory-analysis-mortality.ipynb   # Country-level mortality
-│   └── Exploratory_analysis_socioeconomic.ipynb # World Bank correlations
-└── tests/
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│   Processed CSV Datasets        │       │    World Bank Socioeconomic     │
+│   (JHU CSSE 2020-2023)          │       │    Indicators (188 Countries)   │
+└────────────────┬────────────────┘       └────────────────┬────────────────┘
+                 │                                         │
+                 ▼                                         ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │        backend/import_data.py (Ingestion Pipeline)          │
+   │  • Validates required columns & cleans null/NaN values      │
+   │  • Filters cruise ships (MS Zaandam, Diamond Princess)      │
+   │  • Idempotent Bulk Upsert with Compound Unique Keys         │
+   └─────────────────────────────┬───────────────────────────────┘
+                                 │
+                                 ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │            MongoDB Atlas Cloud Database (covid19_db)        │
+   │  ├── country_statistics  (198 documents, unique country)    │
+   │  ├── daily_cases         (33,813 docs, {country, date} idx) │
+   │  └── country_metadata    (188 docs, World Bank indicators)  │
+   └─────────────────────────────┬───────────────────────────────┘
+                                 │
+                                 ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │        FastAPI REST API & PyMongo Aggregation Service       │
+   │  ├── /api/summary, /api/continents, /api/countries/...      │
+   │  └── Automatic SRV Public DNS Fallback (8.8.8.8, 1.1.1.1)   │
+   └─────────────────────────────┬───────────────────────────────┘
+                                 │
+                                 ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │        Modern Web Dashboard (Tailwind CSS + Chart.js)       │
+   │  ├── Live Atlas Telemetry & KPI Cards                       │
+   │  ├── Interactive Time-Series Pandemic Trajectory            │
+   │  ├── Side-by-Side Top 10 Case & Death Bar Charts            │
+   │  ├── Multi-Country Comparison & World Bank Matrix           │
+   │  └── Live Aggregation Pipeline Code Showcase                │
+   └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Methodology
+## Database Collections & Document Schema
 
-### 1. Data Acquisition
+The database `covid19_db` contains three collections:
 
-The data acquisition pipeline is fully automated via `download_data.py` and the `features/` scripts:
-
-- **JHU CSSE data** is fetched from the [CSSEGISandData/COVID-19](https://github.com/CSSEGISandData/COVID-19) repository. Daily CSV files (time_series_19-covid-*.csv) are downloaded and processed.
-- **World Bank indicators** are retrieved using the `wbdata` Python library. The last available value for each indicator is extracted per country.
-- **Country metadata** (names, codes, continents) is downloaded from Datahub and cached locally.
-
-All raw and processed data is stored under `data/processed/` with the following outputs:
-
-| Output File | Content |
-|-------------|---------|
-| `confirmed_cases.csv` | Cumulative confirmed cases by country over time |
-| `confirmed_cases_daily_change.csv` | Daily new confirmed cases |
-| `confirmed_cases_since_t0.csv` | Reindexed time series (days since 100th case) |
-| `recovered_cases.csv` | Cumulative recovered cases |
-| `dead_cases.csv` | Cumulative deaths |
-| `active_cases.csv` | Active cases = confirmed − recovered − dead |
-| `mortality_rate.csv` | Mortality rate = dead / confirmed |
-| `coordinates.csv` | Country geo coordinates |
-| `continents.csv` | Continent assignments |
-| `country_to_continent.csv` | Country-to-continent lookup |
-| `country_stats.csv` | Country-level summary statistics |
-| `world_bank.csv` | World Bank socioeconomic indicators |
-
-### 2. Data Wrangling
-
-The raw JHU CSSE data undergoes several transformations:
-
-- **Grouping:** Province/state-level rows are aggregated to country level.
-- **Filtering:** Cases occurring on boats/cruise ships are excluded.
-- **Derived metrics:**
-  - `mortality rate = dead / confirmed`
-  - `active cases = confirmed − recovered − dead`
-- **Date handling:** Time series are parsed and aligned across all countries.
-- **Missing values:** Forward-filled where appropriate; countries with insufficient data are flagged.
-
-### 3. Feature Engineering
-
-| Feature | Description |
-|---------|-------------|
-| `Confirmed chg` | Daily change in confirmed cases (first differencing) |
-| `Confirmed t0` | Days since the 100th confirmed case (reindexing) |
-| `Mortality` | Case fatality rate = dead / confirmed |
-| `Country stats` | Aggregated totals and peak metrics per country |
-| `World bank` | Merged socioeconomic indicators (GDP, population, healthcare, life expectancy) |
-| `Ctry to cont` | Country-to-continent mapping for regional aggregation |
-
-### 4. Visualization
-
-The `CovidDataViz` class provides a unified interface for all plots:
-
-- **World-level:** `plot_world_cases()` — stacked area chart of global cases
-- **Continent-level:** `plot_continent_cases(continent)` — breakdown by continent
-- **Country-level:** `plot_country_cases(country)`, `plot_country_cases_chg(country)` — time series and daily changes
-- **Rankings:** `plot_highest_country_stats(metric)` — top-N countries by confirmed, recovered, dead, active, or mortality
-- **Growth analysis:** `plot_growth(countries, periods)` — growth factor trends with configurable averaging windows
-- **Socioeconomic:** `show_corr_mat()` — correlation matrix; `plot_with_slope(x, y)` — scatter plots with regression lines
-
----
-
-## Key Findings
-
-### Global & Continental Trends
-- By **October 2020**, global confirmed cases approached **35 million**.
-- **Asia** exhibited sustained exponential growth, driven largely by **India**.
-- **Australia** had the lowest confirmed case count among continents.
-- Most countries were able to suppress exponential growth within **30–40 days** of reaching their 100th case.
-- **Italy** experienced a massive early surge; the **United Kingdom** showed evidence of a second wave during the analysis period.
-
-### Country-Level Patterns
-- Sharp jumps in time series reflect varying data collection methodologies across countries.
-- Countries with highest confirmed cases: US, India, Brazil, Russia, and several European nations.
-- Mortality rates varied widely, with outliers where risk-group demographics (e.g., elderly population density) played a significant role.
-
-### Socioeconomic Correlations
-| Indicator Pair | Correlation | Interpretation |
-|----------------|-------------|----------------|
-| Rural population % vs. Cases per million | **-0.46** | Virus spread more easily in densely populated urban areas |
-| GDP healthcare expenditure vs. Deaths per million | **+0.38** | Likely reflects better testing/reporting capacity rather than worse outcomes |
-| Life expectancy vs. Mortality % | Non-linear | Outliers to the right suggest risk-group demographics influence |
-
-- **Yemen** was identified as a severe outlier and excluded from correlation analysis.
-- No strong linear relationships were found between individual socioeconomic indicators and mortality, suggesting the need for continent-level or multivariate analysis.
-
-### Key Metrics Summary
-| Metric | Value | Context |
-|--------|-------|---------|
-| Analysis window | Dec 2019 – Oct 2020 | Early pandemic phase |
-| Global confirmed cases | ~35 million | As of 2020-10-05 |
-| Countries analyzed | 200+ | All countries with reported cases |
-| Socioeconomic indicators | 7 | GDP, population, healthcare, life expectancy, rural/urban |
-| Strongest correlation | -0.46 | Rural population % vs. cases per million |
-
----
-
-## Limitations
-
-- **Data latency:** JHU CSSE data reflects reported cases, not true infections; testing availability varied drastically across countries.
-- **Socioeconomic snapshot:** World Bank indicators are static, year-level values — they do not capture within-year policy changes or healthcare system strain during the pandemic.
-- **Correlation ≠ causation:** The observed correlations (e.g., rural population vs. cases) are ecological and do not imply individual-level causality.
-- **Outlier sensitivity:** Yemen and other low-reporting countries were excluded, potentially biasing correlation estimates.
-- **Time window:** Analysis is limited to the first 10 months of the pandemic; long-term trends and vaccine effects are not captured.
-
----
-
-## Next Steps
-
-- **Extend time window** to include 2021–2022 data and compare pre-/post-vaccination dynamics.
-- **Multivariate regression** to isolate the effect of each socioeconomic indicator while controlling for confounders.
-- **Phylogenetic / mobility data integration** (e.g., Google Mobility Reports) to model spread mechanics.
-- **Interactive dashboard** using Plotly Dash or Streamlit for real-time exploration.
-- **Automated daily update pipeline** deployed as a scheduled GitHub Actions workflow.
-
----
-
-## Dataset Version
-
-This analysis is pinned to the **JHU CSSE snapshot from October 2020**. To reproduce exact numbers:
-- Use the `data/download_data.py` script with `--date 2020-10-05` or manually download the time series files from the [CSSEGISandData/COVID-19](https://github.com/CSSEGISandData/COVID-19) repository at commit `5d333ad`.
-
----
-
-## Technical Specifications
-
-### Data Pipeline Architecture
+### 1. `country_statistics` (198 documents)
+Stores current summary metrics for all 198 countries:
+```json
+{
+  "_id": "India",
+  "country": "India",
+  "confirmed": 44690738,
+  "deaths": 530779,
+  "recovered": 0,
+  "active": 44159959,
+  "mortality_rate": 1.19,
+  "continent": "Asia",
+  "latitude": 20.5937,
+  "longitude": 78.9629,
+  "last_updated": "2023-03-09"
+}
 ```
-Raw JHU CSSE CSVs
-       ↓
-make_cases.py → confirmed_cases.csv, recovered_cases.csv, dead_cases.csv
-       ↓
-make_cases_daily_change.py → confirmed_cases_daily_change.csv
-       ↓
-make_cases_since_t0.py → confirmed_cases_since_t0.csv
-       ↓
-make_mortality.py → mortality_rate.csv
-       ↓
-make_continents.py + make_country_to_continent.py → continents.csv, country_to_continent.csv
-       ↓
-make_world_bank.py → world_bank.csv
-       ↓
-CovidDataViz class → reusable plotting methods
+**Indexes**:
+- `_id`: Unique Country Name (Ascending)
+- `confirmed`: Descending (for Top-N queries)
+- `deaths`: Descending
+- `mortality_rate`: Descending
+- `continent`: Ascending
+
+### 2. `daily_cases` (33,813 documents)
+Stores chronological time-series checkpoints from January 2020 to March 2023:
+```json
+{
+  "_id": "India_2021-05-09",
+  "country": "India",
+  "date": "2021-05-09",
+  "confirmed": 22662575,
+  "deaths": 246116,
+  "recovered": 0,
+  "daily_new_cases": 366161,
+  "daily_new_deaths": 3754
+}
+```
+**Indexes**:
+- `_id`: `{country}_{date}` (Unique)
+- Compound: `{ country: 1, date: 1 }` (Unique)
+- Query: `{ date: 1 }`, `{ country: 1 }`
+
+### 3. `country_metadata` (188 documents)
+Stores World Bank developmental indicators:
+```json
+{
+  "_id": "India",
+  "country": "India",
+  "continent": "Asia",
+  "gdp_per_capita": 6997.86,
+  "life_expectancy": 69.66,
+  "gdp_healthcare_pct": 3.01,
+  "rural_population_pct": 65.53,
+  "cases_per_million": 32384.52,
+  "deaths_per_million": 384.62
+}
 ```
 
-### Processing Notes
-- **Boat cases removed:** Cruise ship incidents (Diamond Princess, etc.) excluded from country totals.
-- **Date alignment:** All time series aligned to common date index.
-- **Missing data handling:** Forward-fill for countries with intermittent reporting; zero-fill for unrecovered/dead where appropriate.
+---
+
+## Data Ingestion & Duplicate Prevention
+
+Data ingestion is implemented in `backend/import_data.py`.
+
+### Key Features:
+- **Zero-Duplicate Guarantee**: Uses MongoDB `UpdateOne({"_id": ...}, {"$set": ...}, upsert=True)`. Re-running the import script at any time produces 0 duplicates.
+- **Data Quality**: Filters cruise ships (`MS Zaandam`, `Diamond Princess`) from country aggregations, converts missing values safely, and checks data types.
+- **Network Optimization**: Batches bulk operations in groups of 2,000 for fast upload over internet connections.
+- **Dry-Run Validation**: Supports `--dry-run` to preview data mapping without making database changes.
 
 ---
 
-## How to Reproduce
+## MongoDB Aggregation Pipelines
 
-### Prerequisites
+All statistical computations are executed inside MongoDB Atlas:
 
-```bash
+### Pipeline 1: Worldwide KPI Summary
+```javascript
+db.country_statistics.aggregate([
+  {
+    $group: {
+      _id: null,
+      total_confirmed: { $sum: "$confirmed" },
+      total_deaths: { $sum: "$deaths" },
+      total_active: { $sum: "$active" },
+      total_countries: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      total_confirmed: 1,
+      total_deaths: 1,
+      total_active: 1,
+      total_countries: 1,
+      mortality_rate: {
+        $round: [
+          { $multiply: [{ $divide: ["$total_deaths", "$total_confirmed"] }, 100] },
+          2
+        ]
+      }
+    }
+  }
+])
+```
+
+### Pipeline 2: Continental Rollup
+```javascript
+db.country_statistics.aggregate([
+  { $match: { continent: { $nin: ["Unknown", null] } } },
+  {
+    $group: {
+      _id: "$continent",
+      total_confirmed: { $sum: "$confirmed" },
+      total_deaths: { $sum: "$deaths" },
+      country_count: { $sum: 1 }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      continent: "$_id",
+      total_confirmed: 1,
+      total_deaths: 1,
+      country_count: 1,
+      mortality_rate: {
+        $round: [
+          { $multiply: [{ $divide: ["$total_deaths", "$total_confirmed"] }, 100] },
+          2
+        ]
+      }
+    }
+  },
+  { $sort: { total_confirmed: -1 } }
+])
+```
+
+---
+
+## Web Dashboard Features
+
+The dashboard runs locally and communicates with MongoDB Atlas:
+
+1. **Live Atlas Telemetry**: Live ping status, cluster name, database name, and live document counts.
+2. **Executive KPI Cards**: Worldwide Confirmed Cases, Total Deaths, Case Fatality Rate (Mortality %), and Country Count.
+3. **Interactive Time-Series Chart**: Switch between Cumulative Cases, Cumulative Deaths, and Daily New Cases.
+4. **Top 10 Horizontal Bar Charts**: Comparing highest-load countries by cases and deaths.
+5. **Continental Doughnut & Table**: Case and death distribution across Europe, Asia, Americas, Africa, and Oceania.
+6. **Country Explorer & Search**: Instant autocomplete search, socioeconomic World Bank indicators, and country time series.
+7. **Multi-Country Comparison Matrix**: Select and compare metrics for multiple countries simultaneously.
+8. **Live Pipeline Viewer**: Displays the exact MongoDB aggregation syntax used to power the dashboard.
+
+---
+
+## Technology Stack
+
+- **Database**: MongoDB Atlas (Free M0 Cluster `COVID19Cluster`)
+- **Database Driver**: PyMongo 4.19
+- **Backend API**: FastAPI 0.143 + Uvicorn
+- **Environment Management**: python-dotenv
+- **Frontend UI**: HTML5, Tailwind CSS, Chart.js, Lucide Icons
+- **Data Wrangling**: Pandas, NumPy
+
+---
+
+## Quick Start & Run Instructions (VS Code & PowerShell)
+
+### Step 1: Open Terminal in Project Root
+```powershell
+cd c:\Users\Shabana\Desktop\covid19_analysis
+```
+
+### Step 2: Ensure Dependencies Are Installed
+```powershell
 pip install -r requirements.txt
 ```
 
-### Step 1: Download Raw Data
+### Step 3: Verify MongoDB Atlas Connection
+Run the safe connection diagnostic script:
+```powershell
+python test_mongodb.py
+```
+*Expected output: `[SUCCESS] MongoDB Atlas ping successful!`*
 
-```bash
-python data/download_data.py
+### Step 4: Import Data into MongoDB Atlas
+*(Only needed once or to refresh data)*
+```powershell
+# Optional dry-run check:
+python backend/import_data.py --dry-run
+
+# Run the real ingestion:
+python backend/import_data.py
+```
+*Expected output: `SUMMARY: 34,199 total records processed (34,199 inserted, 0 updated).`*
+
+### Step 5: Start the Analytics Web Application
+```powershell
+uvicorn backend.main:app --reload --port 8000
 ```
 
-This script fetches:
-- JHU CSSE daily case reports
-- World Bank indicator metadata
-- Country/continent code mappings
-
-### Step 2: Generate Processed Features
-
-```bash
-python features/make_all.py
+### Step 6: Open the Dashboard
+Open your web browser and navigate to:
 ```
-
-Or run individual feature scripts in dependency order:
-
-```bash
-python features/make_cases.py
-python features/make_cases_daily_change.py
-python features/make_cases_since_t0.py
-python features/make_mortality.py
-python features/make_continents.py
-python features/make_coordinates.py
-python features/make_country_stats.py
-python features/make_country_to_continent.py
-python features/make_world_bank.py
+http://127.0.0.1:8000
 ```
-
-### Step 3: Run Analysis Notebooks
-
-Open Jupyter Notebook or JupyterLab and execute the notebooks in `notebooks/`:
-
-```bash
-jupyter notebook
+Interactive API documentation is also available at:
+```
+http://127.0.0.1:8000/docs
 ```
 
 ---
 
-## Notebook Guide
+## REST API Documentation
 
-| Notebook | Description | Key Outputs |
-|----------|-------------|-------------|
-| `Data-wrangling.ipynb` | Documents the complete data pipeline from raw sources to processed CSVs | Processed data files in `data/processed/` |
-| `Exploratory-analysis-globally.ipynb` | World and continent-level trends; early pandemic dynamics | World case plots, continent breakdowns, growth factor analysis |
-| `Exploratory-analysis-mortality.ipynb` | Country-level mortality analysis; time series of cases and daily changes | Country case plots, daily change plots, mortality rankings |
-| `Exploratory_analysis_socioeconomic.ipynb` | World Bank correlations; mortality vs. socioeconomic indicators | Correlation matrix, scatter plots with regression slopes |
-| `Exploratory_analysis_fancy_plot.ipynb` | Publication-ready heatmap visualization for repository README | `covid_tiles.png` (1600×800, 200 DPI) |
-
----
-
-## Author
-
-**Sarvesh Kumar Sharma**
-
-- GitHub: [@shsarv](https://github.com/shsarv)
-- LinkedIn: [in/shsarv](https://linkedin.com/in/shsarv)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Safe Atlas connectivity and service health check |
+| `GET` | `/api/summary` | Global summary computed via MongoDB aggregation pipeline |
+| `GET` | `/api/countries/top-cases?limit=10` | Top N countries by confirmed cases |
+| `GET` | `/api/countries/top-deaths?limit=10` | Top N countries by total deaths |
+| `GET` | `/api/countries/top-mortality` | Top N countries by mortality rate |
+| `GET` | `/api/continents` | Continental aggregation breakdown |
+| `GET` | `/api/countries/search?q=...` | Case-insensitive regex country search |
+| `GET` | `/api/countries/{country_name}` | Country statistics + World Bank socioeconomic metadata |
+| `GET` | `/api/countries/compare?countries=...` | Compare multiple countries via MongoDB `$in` operator |
+| `GET` | `/api/trends/{country_name}` | Chronological daily case time series |
+| `GET` | `/api/database-status` | Database storage size, index size, and document counts |
 
 ---
 
-<p align="center">
-  <a href="../README.md">← Back to repository root</a>
-</p>
+## Testing & Verification
+
+Run the automated integration and regression test suites:
+
+```powershell
+# Run the complete MongoDB Atlas & FastAPI integration test suite:
+python -m unittest tests/test_mongodb_app.py
+
+# Run original data-cleaning unit tests:
+python -m unittest tests/test.py
+```
+
+Both test suites pass with **100% success rate (20/20 tests passed)**.
+
+---
+
+## Troubleshooting Guide
+
+### 1. Connection Timeout or SRV Resolution Error
+- **Symptom**: `Server Do53:192.168.0.1@53 answered The DNS operation timed out`
+- **Solution**: The application already includes an automatic fallback resolver (`8.8.8.8`, `1.1.1.1`) inside `backend/database.py` and `test_mongodb.py`. If testing outside Python, check your internet connection or use a public DNS.
+
+### 2. IP Not Whitelisted in MongoDB Atlas
+- **Symptom**: `ServerSelectionTimeoutError: No replica set members match selector`
+- **Solution**:
+  1. Log into [MongoDB Atlas](https://cloud.mongodb.com/).
+  2. Go to **Security** -> **Network Access**.
+  3. Ensure your current IP address is added, or add `0.0.0.0/0` (Allow Access from Anywhere) for testing.
+
+### 3. Missing or Malformed `.env` File
+- **Symptom**: `[ERROR] MONGODB_URI is not set in your .env file`
+- **Solution**: Ensure your `.env` contains:
+  ```env
+  MONGODB_URI=mongodb+srv://<username>:<password>@covid19cluster.djyps0w.mongodb.net/?retryWrites=true&w=majority&appName=COVID19Cluster
+  MONGODB_DB_NAME=covid19_db
+  ```
+  *(Never wrap passwords in `<` and `>` angle brackets).*
+
+---
+
+## Original Exploratory Notebooks & Data Sources
+
+The project preserves all original exploratory data analysis and Jupyter notebooks:
+
+- `notebooks/Data-wrangling.ipynb`: Data pipeline documentation and cleaning.
+- `notebooks/Exploratory-analysis-globally.ipynb`: Global and continental trends.
+- `notebooks/Exploratory_analysis_fancy_plot.ipynb`: Publication-grade visualization.
+- `notebooks/Exploratory-analysis-mortality.ipynb`: Country-level mortality rate investigations.
+- `notebooks/Exploratory_analysis_socioeconomic.ipynb`: World Bank correlation studies.

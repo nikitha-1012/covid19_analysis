@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COVID-19 Big Data Analytics Dashboard | MongoDB Atlas</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    code, pre {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+            },
+            accent: {
+              500: '#3b82f6',
+              600: '#2563eb',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col custom-scrollbar">
+
+  <!-- Header / Navigation Bar -->
+  <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-blue-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="activity" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            COVID-19 Analytics
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              MongoDB Atlas BDA
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">JHU CSSE & World Bank Multi-Collection Aggregation Engine</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center space-x-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+        <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-emerald-600 text-white shadow-md">
+          <span class="flex items-center gap-2"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Global Overview</span>
+        </button>
+        <button onclick="switchTab('explorer')" id="tab-btn-explorer" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <span class="flex items-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Country Explorer</span>
+        </button>
+        <button onclick="switchTab('database')" id="tab-btn-database" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <span class="flex items-center gap-2"><i data-lucide="database" class="w-4 h-4"></i> Atlas Telemetry</span>
+        </button>
+      </nav>
+
+      <!-- Live MongoDB Atlas Status Pill -->
+      <div id="connection-badge" class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
+        <span class="relative flex h-2.5 w-2.5">
+          <span id="ping-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span id="ping-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        </span>
+        <span id="status-text" class="font-medium text-slate-300">Connecting to Atlas...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Alert Banner (Hidden by default) -->
+  <div id="error-banner" class="hidden bg-rose-950/80 border-b border-rose-800 px-4 py-3 text-sm text-rose-200 text-center">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <span id="error-message">Database connection notice</span>
+      <button onclick="retryFetch()" class="text-xs bg-rose-800 hover:bg-rose-700 px-3 py-1 rounded-md text-white font-medium">Retry</button>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- ============================================================== -->
+    <!-- TAB 1: GLOBAL OVERVIEW -->
+    <!-- ============================================================== -->
+    <div id="tab-overview" class="space-y-8">
+
+      <!-- Executive KPI Cards -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Confirmed Cases -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Worldwide Confirmed</span>
+            <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+              <i data-lucide="shield-alert" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <p id="kpi-confirmed" class="text-3xl font-extrabold text-white tracking-tight">---</p>
+            <div class="mt-2 flex items-center text-xs text-slate-400">
+              <span class="text-blue-400 font-semibold mr-1">100%</span> cumulative cases through 2023
+            </div>
+          </div>
+        </div>
+
+        <!-- Total Deaths -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Worldwide Deaths</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+              <i data-lucide="heart-crack" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <p id="kpi-deaths" class="text-3xl font-extrabold text-rose-400 tracking-tight">---</p>
+            <div class="mt-2 flex items-center text-xs text-slate-400">
+              Across <span id="kpi-countries" class="text-white font-semibold mx-1">198</span> reporting countries
+            </div>
+          </div>
+        </div>
+
+        <!-- Mortality Rate -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Case Fatality Rate</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <i data-lucide="percent" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <p id="kpi-mortality" class="text-3xl font-extrabold text-amber-400 tracking-tight">---</p>
+            <div class="mt-2 flex items-center text-xs text-slate-400">
+              MongoDB <code class="text-amber-300 mx-1">$divide</code> pipeline calculation
+            </div>
+          </div>
+        </div>
+
+        <!-- Tracked Countries -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Dataset Time Span</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <i data-lucide="calendar" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="mt-3">
+            <p id="kpi-date-range" class="text-xl font-bold text-emerald-400 tracking-tight mt-1">2020 - 2023</p>
+            <div class="mt-3 flex items-center text-xs text-slate-400">
+              Latest Record: <span class="text-slate-200 font-semibold ml-1">March 09, 2023</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Global Chronological Time-Series Chart -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-5 h-5 text-emerald-400"></i>
+              Global Pandemic Trajectory
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+              Time-series aggregation from <code class="text-emerald-400">daily_cases</code> collection across 1,143 dates.
+            </p>
+          </div>
+          <div class="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+            <button onclick="setTrendMetric('confirmed')" id="metric-btn-confirmed" class="px-3 py-1.5 rounded-lg font-medium transition-all bg-emerald-600 text-white">Cumulative Cases</button>
+            <button onclick="setTrendMetric('deaths')" id="metric-btn-deaths" class="px-3 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">Cumulative Deaths</button>
+            <button onclick="setTrendMetric('daily')" id="metric-btn-daily" class="px-3 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white">Daily New Cases</button>
+          </div>
+        </div>
+        <div class="mt-6 relative h-80 sm:h-96 w-full">
+          <canvas id="globalTrendChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Side-by-Side Analytics Charts: Top Cases & Top Deaths -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Top 10 Confirmed Cases -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-blue-400"></i>
+                Top 10 Countries by Cases
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">MongoDB <code class="text-blue-300">.sort('confirmed', -1).limit(10)</code></p>
+            </div>
+            <span class="text-xs bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-full font-semibold border border-blue-500/20">Highest Load</span>
+          </div>
+          <div class="mt-5 relative h-72 w-full">
+            <canvas id="topCasesChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Top 10 Deaths -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
+                Top 10 Countries by Deaths
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">MongoDB <code class="text-rose-300">.sort('deaths', -1).limit(10)</code></p>
+            </div>
+            <span class="text-xs bg-rose-500/10 text-rose-400 px-2.5 py-1 rounded-full font-semibold border border-rose-500/20">Mortality Impact</span>
+          </div>
+          <div class="mt-5 relative h-72 w-full">
+            <canvas id="topDeathsChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Continent Aggregation Breakdown -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="globe" class="w-5 h-5 text-purple-400"></i>
+              Continental Pandemic Distribution
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Computed via MongoDB <code class="text-purple-300">$group: { _id: "$continent", cases: { $sum: "$confirmed" } }</code> pipeline.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+          <div class="lg:col-span-1 relative h-64 flex items-center justify-center">
+            <canvas id="continentDoughnutChart"></canvas>
+          </div>
+          <div class="lg:col-span-2 overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="text-xs uppercase text-slate-400 bg-slate-950/60 border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Continent</th>
+                  <th class="py-3 px-4 text-right">Confirmed</th>
+                  <th class="py-3 px-4 text-right">Deaths</th>
+                  <th class="py-3 px-4 text-right">Mortality %</th>
+                  <th class="py-3 px-4 text-right">Countries</th>
+                </tr>
+              </thead>
+              <tbody id="continent-table-body" class="divide-y divide-slate-800/60 font-medium">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 2: COUNTRY EXPLORER & COMPARISON -->
+    <!-- ============================================================== -->
+    <div id="tab-explorer" class="hidden space-y-8">
+
+      <!-- Search and Comparison Header -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div class="relative flex-grow max-w-lg">
+            <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5"></i>
+            <input
+              type="text"
+              id="country-search-input"
+              placeholder="Search country (e.g., India, US, Brazil, Germany)..."
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-11 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              oninput="handleCountrySearch(this.value)"
+            />
+            <!-- Search Results Dropdown -->
+            <div id="search-dropdown" class="hidden absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-60 overflow-y-auto custom-scrollbar">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400">Quick Select:</span>
+            <button onclick="selectCountry('India')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-all">India</button>
+            <button onclick="selectCountry('US')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-all">United States</button>
+            <button onclick="selectCountry('Brazil')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-all">Brazil</button>
+            <button onclick="selectCountry('United Kingdom')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-all">UK</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Selected Country Detail View -->
+      <section id="country-detail-section" class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-3">
+              <h2 id="country-name-title" class="text-2xl font-bold text-white tracking-tight">India</h2>
+              <span id="country-continent-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Asia</span>
+            </div>
+            <p id="country-coords" class="text-xs text-slate-400 mt-1">Coordinates: 20.59° N, 78.96° E</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="addToCompareCurrent()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-md flex items-center gap-2 transition-all">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Add to Comparison
+            </button>
+          </div>
+        </div>
+
+        <!-- Country Metric Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-medium">Total Confirmed</span>
+            <p id="cd-confirmed" class="text-xl font-bold text-white mt-1">---</p>
+          </div>
+          <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-medium">Total Deaths</span>
+            <p id="cd-deaths" class="text-xl font-bold text-rose-400 mt-1">---</p>
+          </div>
+          <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-medium">Mortality Rate</span>
+            <p id="cd-mortality" class="text-xl font-bold text-amber-400 mt-1">---</p>
+          </div>
+          <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-medium">Active (Est.)</span>
+            <p id="cd-active" class="text-xl font-bold text-blue-400 mt-1">---</p>
+          </div>
+        </div>
+
+        <!-- World Bank Socioeconomic Indicators from country_metadata -->
+        <div class="bg-slate-950/40 rounded-xl p-5 border border-slate-800/80">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2 mb-3">
+            <i data-lucide="coins" class="w-4 h-4 text-emerald-400"></i>
+            World Bank Socioeconomic Indicators (<code class="text-emerald-400">country_metadata</code>)
+          </h4>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div>
+              <span class="text-slate-500">GDP per Capita:</span>
+              <p id="meta-gdp" class="text-sm font-semibold text-slate-200 mt-0.5">---</p>
+            </div>
+            <div>
+              <span class="text-slate-500">Life Expectancy:</span>
+              <p id="meta-life" class="text-sm font-semibold text-slate-200 mt-0.5">---</p>
+            </div>
+            <div>
+              <span class="text-slate-500">Health Expenditure (% GDP):</span>
+              <p id="meta-health" class="text-sm font-semibold text-slate-200 mt-0.5">---</p>
+            </div>
+            <div>
+              <span class="text-slate-500">Rural Population %:</span>
+              <p id="meta-rural" class="text-sm font-semibold text-slate-200 mt-0.5">---</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Country Historical Trend Chart -->
+        <div>
+          <h4 class="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
+            Historical Trajectory for <span id="chart-country-label">India</span>
+          </h4>
+          <div class="relative h-80 w-full bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+            <canvas id="countryTrendChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Multi-Country Comparison Tool -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="git-compare" class="w-5 h-5 text-blue-400"></i>
+              Multi-Country Comparison Matrix
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Select up to 5 countries for cross-sectional Big Data comparative analysis.</p>
+          </div>
+          <button onclick="clearComparison()" class="text-xs text-slate-400 hover:text-rose-400 transition-all">Clear All</button>
+        </div>
+
+        <!-- Selected Tags -->
+        <div id="compare-chips" class="flex flex-wrap gap-2">
+          <!-- Dynamically populated chips -->
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-xs uppercase text-slate-400 bg-slate-950/60 border-b border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Country</th>
+                <th class="py-3 px-4">Continent</th>
+                <th class="py-3 px-4 text-right">Confirmed</th>
+                <th class="py-3 px-4 text-right">Deaths</th>
+                <th class="py-3 px-4 text-right">Mortality %</th>
+                <th class="py-3 px-4 text-right">GDP per Capita</th>
+                <th class="py-3 px-4 text-right">Life Expectancy</th>
+              </tr>
+            </thead>
+            <tbody id="compare-table-body" class="divide-y divide-slate-800/60 font-medium">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- TAB 3: MONGODB ATLAS TELEMETRY & ARCHITECTURE -->
+    <!-- ============================================================== -->
+    <div id="tab-database" class="hidden space-y-8">
+
+      <!-- Live Atlas Telemetry Cards -->
+      <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Cluster Connection</span>
+            <i data-lucide="server" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+          <div class="mt-4 space-y-2">
+            <p id="db-target-name" class="text-2xl font-bold text-white">covid19_db</p>
+            <p class="text-xs text-slate-400">Cluster: <code class="text-emerald-400">COVID19Cluster (M0 Free Tier)</code></p>
+            <p class="text-xs text-slate-400">Driver: <code class="text-slate-300">PyMongo (Python 3.13)</code></p>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Storage & Index Size</span>
+            <i data-lucide="hard-drive" class="w-5 h-5 text-blue-400"></i>
+          </div>
+          <div class="mt-4 space-y-2">
+            <p id="db-data-size" class="text-2xl font-bold text-blue-400">--- KB</p>
+            <p class="text-xs text-slate-400">Storage: <span id="db-storage-size" class="text-slate-200">---</span></p>
+            <p class="text-xs text-slate-400">Indexes: <span id="db-index-size" class="text-slate-200">---</span></p>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Total Documents Stored</span>
+            <i data-lucide="layers" class="w-5 h-5 text-purple-400"></i>
+          </div>
+          <div class="mt-4 space-y-2">
+            <p id="db-total-docs" class="text-2xl font-bold text-purple-400">---</p>
+            <p class="text-xs text-slate-400">Across 3 schema collections</p>
+            <p class="text-xs text-slate-400">Idempotent Upserts: <span class="text-emerald-400 font-semibold">Zero Duplicates</span></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Collections Breakdown & Indexing Schema -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <h3 class="text-base font-bold text-white flex items-center gap-2 mb-4">
+          <i data-lucide="folder-tree" class="w-5 h-5 text-emerald-400"></i>
+          Collection Architecture & Indexing Strategy
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- country_statistics -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-white">country_statistics</span>
+              <span id="count-country-stats" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">198 docs</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Latest country-level totals with coordinates and continent mappings.</p>
+            <div class="mt-3 text-[11px] text-slate-500 space-y-1">
+              <p><strong class="text-slate-400">Unique Index:</strong> <code>country (asc)</code></p>
+              <p><strong class="text-slate-400">Sort Indexes:</strong> <code>confirmed (desc), deaths (desc)</code></p>
+            </div>
+          </div>
+
+          <!-- daily_cases -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-white">daily_cases</span>
+              <span id="count-daily-cases" class="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">33,813 docs</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Chronological daily time series for Global & countries (2020-2023).</p>
+            <div class="mt-3 text-[11px] text-slate-500 space-y-1">
+              <p><strong class="text-slate-400">Compound Index:</strong> <code>{country: 1, date: 1} (unique)</code></p>
+              <p><strong class="text-slate-400">Query Index:</strong> <code>date (asc)</code></p>
+            </div>
+          </div>
+
+          <!-- country_metadata -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-white">country_metadata</span>
+              <span id="count-country-meta" class="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">188 docs</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">World Bank indicators: GDP per capita, life expectancy, healthcare.</p>
+            <div class="mt-3 text-[11px] text-slate-500 space-y-1">
+              <p><strong class="text-slate-400">Unique Index:</strong> <code>country (asc)</code></p>
+              <p><strong class="text-slate-400">Group Index:</strong> <code>continent (asc)</code></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MongoDB Aggregation Code Showcase -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <h3 class="text-base font-bold text-white flex items-center gap-2 mb-2">
+          <i data-lucide="code-2" class="w-5 h-5 text-amber-400"></i>
+          Demonstration Aggregation Pipelines
+        </h3>
+        <p class="text-xs text-slate-400 mb-4">Calculations executed inside the MongoDB Atlas distributed query engine:</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">1. Worldwide KPI Aggregation Pipeline</span>
+            <pre class="mt-2 text-xs text-slate-300 overflow-x-auto p-3 bg-slate-900/90 rounded-lg custom-scrollbar"><code>[
+  {
+    "$group": {
+      "_id": null,
+      "total_confirmed": { "$sum": "$confirmed" },
+      "total_deaths": { "$sum": "$deaths" },
+      "total_active": { "$sum": "$active" },
+      "total_countries": { "$sum": 1 }
+    }
+  },
+  {
+    "$project": {
+      "_id": 0,
+      "total_confirmed": 1,
+      "total_deaths": 1,
+      "mortality_rate": {
+        "$round": [
+          { "$multiply": [{ "$divide": ["$total_deaths", "$total_confirmed"] }, 100] },
+          2
+        ]
+      }
+    }
+  }
+]</code></pre>
+          </div>
+
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <span class="text-xs font-semibold text-purple-400 uppercase tracking-wider">2. Continental Rollup Pipeline</span>
+            <pre class="mt-2 text-xs text-slate-300 overflow-x-auto p-3 bg-slate-900/90 rounded-lg custom-scrollbar"><code>[
+  { "$match": { "continent": { "$nin": ["Unknown", null] } } },
+  {
+    "$group": {
+      "_id": "$continent",
+      "total_confirmed": { "$sum": "$confirmed" },
+      "total_deaths": { "$sum": "$deaths" },
+      "country_count": { "$sum": 1 }
+    }
+  },
+  {
+    "$project": {
+      "_id": 0,
+      "continent": "$_id",
+      "total_confirmed": 1,
+      "total_deaths": 1,
+      "country_count": 1,
+      "mortality_rate": {
+        "$round": [
+          { "$multiply": [{ "$divide": ["$total_deaths", "$total_confirmed"] }, 100] },
+          2
+        ]
+      }
+    }
+  },
+  { "$sort": { "total_confirmed": -1 } }
+]</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Terminal Commands Reference -->
+      <section class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <h3 class="text-base font-bold text-white flex items-center gap-2 mb-3">
+          <i data-lucide="terminal" class="w-5 h-5 text-blue-400"></i>
+          PowerShell Execution Commands (VS Code)
+        </h3>
+        <div class="space-y-3 text-xs">
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+            <span class="text-slate-400 font-medium block mb-1">1. Test MongoDB Atlas Connection:</span>
+            <code class="text-emerald-400">python test_mongodb.py</code>
+          </div>
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+            <span class="text-slate-400 font-medium block mb-1">2. Run CSV Data Ingestion Pipeline:</span>
+            <code class="text-emerald-400">python backend/import_data.py</code>
+          </div>
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+            <span class="text-slate-400 font-medium block mb-1">3. Start Analytics Web Application:</span>
+            <code class="text-emerald-400">uvicorn backend.main:app --reload --port 8000</code>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-slate-900 border-t border-slate-800 py-6 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <p>COVID-19 Big Data Analytics Project | BDA Final Year Engineering Demonstration</p>
+      <p class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+        Database: MongoDB Atlas (Free Cluster) | Server: FastAPI
+      </p>
+    </div>
+  </footer>
+
+  <!-- ============================================================== -->
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <!-- ============================================================== -->
+  <script>
+    // State management
+    const state = {
+      summary: null,
+      topCases: [],
+      topDeaths: [],
+      continents: [],
+      globalTrend: [],
+      activeTrendMetric: 'confirmed',
+      selectedCountry: 'India',
+      countryTrend: [],
+      compareList: ['India', 'US', 'Brazil', 'United Kingdom'],
+      dbStatus: null,
+      charts: {}
+    };
+
+    // Formatters
+    const fmt = (num) => (num !== undefined && num !== null) ? Number(num).toLocaleString('en-US') : '---';
+    const fmtCur = (num) => (num !== undefined && num !== null && num > 0) ? '$' + Number(num).toLocaleString('en-US', {maximumFractionDigits: 0}) : 'N/A';
+
+    // Switch between navigation tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-600', 'text-white', 'shadow-md');
+        btn.classList.add('text-slate-400');
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-emerald-600', 'text-white', 'shadow-md');
+        activeBtn.classList.remove('text-slate-400');
+      }
+
+      document.getElementById('tab-overview').classList.toggle('hidden', tabId !== 'overview');
+      document.getElementById('tab-explorer').classList.toggle('hidden', tabId !== 'explorer');
+      document.getElementById('tab-database').classList.toggle('hidden', tabId !== 'database');
+
+      // Resize charts on tab change to ensure proper display
+      setTimeout(() => {
+        Object.values(state.charts).forEach(c => c && c.resize && c.resize());
+      }, 100);
+    }
+
+    // Initialize application data
+    async function init() {
+      lucide.createIcons();
+      await fetchHealth();
+      await fetchGlobalSummary();
+      await fetchTopRankings();
+      await fetchContinentBreakdown();
+      await fetchGlobalTrend();
+      await selectCountry(state.selectedCountry);
+      await refreshComparison();
+      await fetchDbStatus();
+    }
+
+    // Health check
+    async function fetchHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        const connected = data.database && data.database.connected;
+        const badge = document.getElementById('status-text');
+        const pingDot = document.getElementById('ping-dot');
+        const pingPing = document.getElementById('ping-ping');
+
+        if (connected) {
+          badge.textContent = `Atlas Connected (${data.database.target_db})`;
+          badge.className = 'font-medium text-emerald-400';
+          pingDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500';
+          pingPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+        } else {
+          badge.textContent = 'Atlas Offline';
+          badge.className = 'font-medium text-rose-400';
+          pingDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500';
+          pingPing.className = 'hidden';
+          showError('Failed to connect to MongoDB Atlas. Ensure IP access is open in Atlas.');
+        }
+      } catch (e) {
+        console.error('Health check failed', e);
+        showError('Backend API unreachable.');
+      }
+    }
+
+    // Fetch Global Summary
+    async function fetchGlobalSummary() {
+      try {
+        const res = await fetch('/api/summary');
+        const data = await res.json();
+        state.summary = data;
+
+        document.getElementById('kpi-confirmed').textContent = fmt(data.total_confirmed);
+        document.getElementById('kpi-deaths').textContent = fmt(data.total_deaths);
+        document.getElementById('kpi-mortality').textContent = (data.mortality_rate || 0) + '%';
+        document.getElementById('kpi-countries').textContent = data.total_countries || 198;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Fetch Top Rankings
+    async function fetchTopRankings() {
+      try {
+        const [casesRes, deathsRes] = await Promise.all([
+          fetch('/api/countries/top-cases?limit=10'),
+          fetch('/api/countries/top-deaths?limit=10')
+        ]);
+        state.topCases = await casesRes.json();
+        state.topDeaths = await deathsRes.json();
+
+        renderTopCasesChart();
+        renderTopDeathsChart();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Fetch Continent Breakdown
+    async function fetchContinentBreakdown() {
+      try {
+        const res = await fetch('/api/continents');
+        state.continents = await res.json();
+
+        renderContinentTable();
+        renderContinentDoughnut();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderContinentTable() {
+      const tbody = document.getElementById('continent-table-body');
+      tbody.innerHTML = '';
+      state.continents.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-900/40 transition-colors';
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-semibold text-white">${c.continent}</td>
+          <td class="py-3 px-4 text-right text-blue-400">${fmt(c.total_confirmed)}</td>
+          <td class="py-3 px-4 text-right text-rose-400">${fmt(c.total_deaths)}</td>
+          <td class="py-3 px-4 text-right text-amber-400">${c.mortality_rate}%</td>
+          <td class="py-3 px-4 text-right text-slate-400">${c.country_count}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Fetch Global Trend
+    async function fetchGlobalTrend() {
+      try {
+        const res = await fetch('/api/trends/Global?limit=500');
+        state.globalTrend = await res.json();
+        renderGlobalTrendChart();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function setTrendMetric(metric) {
+      state.activeTrendMetric = metric;
+      ['confirmed', 'deaths', 'daily'].forEach(m => {
+        const btn = document.getElementById(`metric-btn-${m}`);
+        if (m === metric) {
+          btn.className = 'px-3 py-1.5 rounded-lg font-medium transition-all bg-emerald-600 text-white';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg font-medium transition-all text-slate-400 hover:text-white';
+        }
+      });
+      renderGlobalTrendChart();
+    }
+
+    // Render Global Trend Chart
+    function renderGlobalTrendChart() {
+      const ctx = document.getElementById('globalTrendChart').getContext('2d');
+      if (state.charts.globalTrend) state.charts.globalTrend.destroy();
+
+      const labels = state.globalTrend.map(d => d.date);
+      let data = [];
+      let label = '';
+      let color = '#10b981';
+      let bgColor = 'rgba(16, 185, 129, 0.15)';
+
+      if (state.activeTrendMetric === 'confirmed') {
+        data = state.globalTrend.map(d => d.confirmed);
+        label = 'Cumulative Confirmed Cases';
+        color = '#3b82f6';
+        bgColor = 'rgba(59, 130, 246, 0.15)';
+      } else if (state.activeTrendMetric === 'deaths') {
+        data = state.globalTrend.map(d => d.deaths);
+        label = 'Cumulative Deaths';
+        color = '#f43f5e';
+        bgColor = 'rgba(244, 63, 94, 0.15)';
+      } else {
+        data = state.globalTrend.map(d => d.daily_new_cases);
+        label = 'Daily New Cases';
+        color = '#10b981';
+        bgColor = 'rgba(16, 185, 129, 0.15)';
+      }
+
+      state.charts.globalTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            backgroundColor: bgColor,
+            fill: true,
+            tension: 0.2,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#cbd5e1',
+              padding: 10,
+              callbacks: {
+                label: (ctx) => `${label}: ${fmt(ctx.raw)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#64748b', maxTicksLimit: 10 }
+            },
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: {
+                color: '#64748b',
+                callback: (val) => val >= 1e6 ? (val / 1e6).toFixed(1) + 'M' : val >= 1e3 ? (val / 1e3).toFixed(0) + 'k' : val
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Render Top Cases Chart
+    function renderTopCasesChart() {
+      const ctx = document.getElementById('topCasesChart').getContext('2d');
+      if (state.charts.topCases) state.charts.topCases.destroy();
+
+      state.charts.topCases = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: state.topCases.map(c => c.country),
+          datasets: [{
+            label: 'Confirmed Cases',
+            data: state.topCases.map(c => c.confirmed),
+            backgroundColor: '#3b82f6',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: { label: (ctx) => `Cases: ${fmt(ctx.raw)}` }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: {
+                color: '#64748b',
+                callback: (val) => (val / 1e6).toFixed(0) + 'M'
+              }
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: '#cbd5e1', font: { weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    // Render Top Deaths Chart
+    function renderTopDeathsChart() {
+      const ctx = document.getElementById('topDeathsChart').getContext('2d');
+      if (state.charts.topDeaths) state.charts.topDeaths.destroy();
+
+      state.charts.topDeaths = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: state.topDeaths.map(c => c.country),
+          datasets: [{
+            label: 'Total Deaths',
+            data: state.topDeaths.map(c => c.deaths),
+            backgroundColor: '#f43f5e',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: { label: (ctx) => `Deaths: ${fmt(ctx.raw)}` }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: {
+                color: '#64748b',
+                callback: (val) => val >= 1e6 ? (val / 1e6).toFixed(1) + 'M' : (val / 1e3).toFixed(0) + 'k'
+              }
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: '#cbd5e1', font: { weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    // Render Continent Doughnut
+    function renderContinentDoughnut() {
+      const ctx = document.getElementById('continentDoughnutChart').getContext('2d');
+      if (state.charts.continent) state.charts.continent.destroy();
+
+      state.charts.continent = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: state.continents.map(c => c.continent),
+          datasets: [{
+            data: state.continents.map(c => c.total_confirmed),
+            backgroundColor: [
+              '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4'
+            ],
+            borderWidth: 2,
+            borderColor: '#0f172a'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#94a3b8', boxWidth: 12, padding: 12 }
+            },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${fmt(ctx.raw)} cases`
+              }
+            }
+          },
+          cutout: '68%'
+        }
+      });
+    }
+
+    // Handle Country Search
+    let searchTimeout = null;
+    function handleCountrySearch(val) {
+      clearTimeout(searchTimeout);
+      const dropdown = document.getElementById('search-dropdown');
+      if (!val || val.trim().length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      searchTimeout = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/countries/search?q=${encodeURIComponent(val)}`);
+          const countries = await res.json();
+          dropdown.innerHTML = '';
+          if (countries.length === 0) {
+            dropdown.innerHTML = '<div class="p-3 text-xs text-slate-500">No countries found.</div>';
+          } else {
+            countries.forEach(c => {
+              const div = document.createElement('div');
+              div.className = 'px-4 py-2.5 hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs text-slate-200 border-b border-slate-800/50';
+              div.innerHTML = `
+                <span class="font-semibold">${c.country}</span>
+                <span class="text-slate-400">${fmt(c.confirmed)} cases</span>
+              `;
+              div.onclick = () => {
+                selectCountry(c.country);
+                dropdown.classList.add('hidden');
+                document.getElementById('country-search-input').value = '';
+              };
+              dropdown.appendChild(div);
+            });
+          }
+          dropdown.classList.remove('hidden');
+        } catch (e) {
+          console.error(e);
+        }
+      }, 200);
+    }
+
+    // Select Country for Detailed View
+    async function selectCountry(countryName) {
+      state.selectedCountry = countryName;
+      try {
+        const [detailRes, trendRes] = await Promise.all([
+          fetch(`/api/countries/${encodeURIComponent(countryName)}`),
+          fetch(`/api/trends/${encodeURIComponent(countryName)}?limit=300`)
+        ]);
+
+        if (!detailRes.ok) return;
+
+        const doc = await detailRes.json();
+        const trend = await trendRes.json();
+        state.countryTrend = trend;
+
+        // Populate detail view
+        document.getElementById('country-name-title').textContent = doc.country;
+        document.getElementById('chart-country-label').textContent = doc.country;
+        document.getElementById('country-continent-badge').textContent = doc.continent || 'Global';
+        document.getElementById('country-coords').textContent = `Coordinates: ${doc.latitude || 0}° N, ${doc.longitude || 0}° E`;
+
+        document.getElementById('cd-confirmed').textContent = fmt(doc.confirmed);
+        document.getElementById('cd-deaths').textContent = fmt(doc.deaths);
+        document.getElementById('cd-mortality').textContent = (doc.mortality_rate || 0) + '%';
+        document.getElementById('cd-active').textContent = fmt(doc.active);
+
+        // Socioeconomic metadata
+        const meta = doc.metadata || {};
+        document.getElementById('meta-gdp').textContent = fmtCur(meta.gdp_per_capita);
+        document.getElementById('meta-life').textContent = meta.life_expectancy ? `${meta.life_expectancy.toFixed(1)} yrs` : 'N/A';
+        document.getElementById('meta-health').textContent = meta.gdp_healthcare_pct ? `${meta.gdp_healthcare_pct.toFixed(1)}%` : 'N/A';
+        document.getElementById('meta-rural').textContent = meta.rural_population_pct ? `${meta.rural_population_pct.toFixed(1)}%` : 'N/A';
+
+        renderCountryTrendChart(doc.country, trend);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Render Country Historical Trend
+    function renderCountryTrendChart(country, trend) {
+      const ctx = document.getElementById('countryTrendChart').getContext('2d');
+      if (state.charts.countryTrend) state.charts.countryTrend.destroy();
+
+      state.charts.countryTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: trend.map(t => t.date),
+          datasets: [
+            {
+              label: 'Confirmed',
+              data: trend.map(t => t.confirmed),
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              fill: true,
+              tension: 0.2,
+              borderWidth: 2,
+              pointRadius: 0
+            },
+            {
+              label: 'Deaths',
+              data: trend.map(t => t.deaths),
+              borderColor: '#f43f5e',
+              backgroundColor: 'transparent',
+              tension: 0.2,
+              borderWidth: 2,
+              pointRadius: 0
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#cbd5e1' }
+            },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              borderColor: '#334155',
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${fmt(ctx.raw)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: { color: '#64748b', maxTicksLimit: 10 }
+            },
+            y: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              ticks: {
+                color: '#64748b',
+                callback: (val) => val >= 1e6 ? (val / 1e6).toFixed(1) + 'M' : val >= 1e3 ? (val / 1e3).toFixed(0) + 'k' : val
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Multi-Country Comparison
+    function addToCompareCurrent() {
+      if (!state.compareList.includes(state.selectedCountry)) {
+        if (state.compareList.length >= 6) {
+          alert('Maximum 6 countries can be compared.');
+          return;
+        }
+        state.compareList.push(state.selectedCountry);
+        refreshComparison();
+      }
+    }
+
+    function removeCompareCountry(cname) {
+      state.compareList = state.compareList.filter(c => c !== cname);
+      refreshComparison();
+    }
+
+    function clearComparison() {
+      state.compareList = [];
+      refreshComparison();
+    }
+
+    async function refreshComparison() {
+      renderCompareChips();
+      const tbody = document.getElementById('compare-table-body');
+      if (state.compareList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-slate-500">No countries selected for comparison.</td></tr>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/countries/compare?countries=${encodeURIComponent(state.compareList.join(','))}`);
+        const list = await res.json();
+        tbody.innerHTML = '';
+        list.forEach(c => {
+          const meta = c.metadata || {};
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-900/40 transition-colors';
+          tr.innerHTML = `
+            <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+              ${c.country}
+            </td>
+            <td class="py-3 px-4 text-slate-400">${c.continent || 'N/A'}</td>
+            <td class="py-3 px-4 text-right text-blue-400">${fmt(c.confirmed)}</td>
+            <td class="py-3 px-4 text-right text-rose-400">${fmt(c.deaths)}</td>
+            <td class="py-3 px-4 text-right text-amber-400">${c.mortality_rate}%</td>
+            <td class="py-3 px-4 text-right text-emerald-400">${fmtCur(meta.gdp_per_capita)}</td>
+            <td class="py-3 px-4 text-right text-purple-400">${meta.life_expectancy ? meta.life_expectancy.toFixed(1) + ' yrs' : 'N/A'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderCompareChips() {
+      const container = document.getElementById('compare-chips');
+      container.innerHTML = '';
+      state.compareList.forEach(c => {
+        const span = document.createElement('span');
+        span.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700';
+        span.innerHTML = `
+          ${c}
+          <button onclick="removeCompareCountry('${c}')" class="text-slate-400 hover:text-rose-400">
+            &times;
+          </button>
+        `;
+        container.appendChild(span);
+      });
+    }
+
+    // Fetch Database Status & Telemetry
+    async function fetchDbStatus() {
+      try {
+        const res = await fetch('/api/database-status');
+        const data = await res.json();
+        state.dbStatus = data;
+
+        document.getElementById('db-target-name').textContent = data.database_name || 'covid19_db';
+        document.getElementById('db-data-size').textContent = (data.data_size_kb || 0).toLocaleString() + ' KB';
+        document.getElementById('db-storage-size').textContent = (data.storage_size_kb || 0).toLocaleString() + ' KB';
+        document.getElementById('db-index-size').textContent = (data.index_size_kb || 0).toLocaleString() + ' KB';
+
+        const counts = data.document_counts || {};
+        let totalDocs = 0;
+        Object.values(counts).forEach(c => totalDocs += c);
+        document.getElementById('db-total-docs').textContent = totalDocs.toLocaleString() + ' records';
+
+        if (counts.country_statistics !== undefined) {
+          document.getElementById('count-country-stats').textContent = `${counts.country_statistics} docs`;
+        }
+        if (counts.daily_cases !== undefined) {
+          document.getElementById('count-daily-cases').textContent = `${counts.daily_cases.toLocaleString()} docs`;
+        }
+        if (counts.country_metadata !== undefined) {
+          document.getElementById('count-country-meta').textContent = `${counts.country_metadata} docs`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('error-message').textContent = msg;
+      document.getElementById('error-banner').classList.remove('hidden');
+    }
+
+    function retryFetch() {
+      document.getElementById('error-banner').classList.add('hidden');
+      init();
+    }
+
+    // Close search dropdown on click outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('search-dropdown');
+      const input = document.getElementById('country-search-input');
+      if (dropdown && !dropdown.contains(e.target) && e.target !== input) {
+        dropdown.classList.add('hidden');
+      }
+    });
+
+    // Run on page load
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
+
